@@ -42,21 +42,19 @@ typedef struct qtree_t {
     struct qtree_t* branch[4];
     SDL_Rect bounds;
     bool sub;
-    int pNum;
 } qtree_t;
 
-int pCount = 100;
+int pCount = 1000;
 particle_t* particles;
 float dt = 0.05;
 
 void SetPalette(int* palette, int index, SDL_Renderer* renderer);
-void loop(bool* running, SDL_Event* event);
 void drawTree(SDL_Renderer* renderer, qtree_t* tree);
 int boundsCheck(particle_t* particle, SDL_Rect* rect);
 void genTree(qtree_t* tree, particle_t** buffer, int count);
 
 int main(int argc, char **argv) {
-    srand(time(NULL));
+    //srand(time(NULL));
     // Initialize SDL
     CHECK_ERROR(SDL_Init(SDL_INIT_VIDEO) != 0, SDL_GetError());
     SDL_Window *window = SDL_CreateWindow("Hello, SDL2", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL);
@@ -70,18 +68,10 @@ int main(int argc, char **argv) {
     for (int i = 0; i < pCount; i++){
         particles[i].pX = randInt(0, 800);
         particles[i].pY = randInt(0, 600);
-        particles[i].vX = 0;
-        particles[i].vY = 0;
+        particles[i].vX = randInt(0, 100) - 50;
+        particles[i].vY = randInt(0, 100) - 50;
         buffer[i] = &particles[i];
     }
-
-    qtree_t tree;
-    tree.bounds.x = 0;
-    tree.bounds.y = 0;
-    tree.bounds.w = 800;
-    tree.bounds.h = 600;
-    tree.sub = 0;
-    genTree(&tree, buffer, pCount);
     bool running = true;
     SDL_Event event;
     while(running) {
@@ -90,13 +80,20 @@ int main(int argc, char **argv) {
                  running = false;
             }                    
         }
+        qtree_t tree;
+        tree.bounds.x = 0;
+        tree.bounds.y = 0;
+        tree.bounds.w = 800;
+        tree.bounds.h = 600;
+        tree.sub = 0;
+        genTree(&tree, buffer, pCount);
         SetPalette(palette, 0, renderer);
         SDL_RenderClear(renderer);
         SetPalette(palette, 1, renderer);
         for (int i = 0; i < pCount; i++){
             SDL_RenderDrawPoint(renderer, particles[i].pX, particles[i].pY);
-            //particles[i].pX += particles[i].vX * dt;
-            //particles[i].pY += particles[i].vY * dt;
+            particles[i].pX += particles[i].vX * dt;
+            particles[i].pY += particles[i].vY * dt;
         }
         SetPalette(palette, 2, renderer);
         drawTree(renderer, &tree);
@@ -137,6 +134,7 @@ void genTree(qtree_t* tree, particle_t** buffer, int count){
         
         for (int i = 0; i < 4; i++) {
             (tree->branch)[i] = malloc(sizeof(qtree_t));
+            (tree->branch)[i]->sub = 0;
             (tree->branch)[i]->bounds.w = tree->bounds.w/2;
             (tree->branch)[i]->bounds.h = tree->bounds.h/2;
         }
@@ -149,7 +147,7 @@ void genTree(qtree_t* tree, particle_t** buffer, int count){
         (tree->branch)[2]->bounds.y = tree->bounds.y + (tree->bounds.h/2);
         (tree->branch)[3]->bounds.x = tree->bounds.x + (tree->bounds.w/2);
         (tree->branch)[3]->bounds.y = tree->bounds.y + (tree->bounds.h/2);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             genTree((tree->branch)[i], In, pNum);
         }
     }
