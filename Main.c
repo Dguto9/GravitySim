@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <time.h>
-#include <string.h>
 
 #include <SDL2/SDL.h>
 // Normally SDL2 will redefine the main entry point of the program for Windows applications
@@ -63,6 +61,7 @@ void drawTreeCM(SDL_Renderer* renderer, qtree_t* tree);
 int boundsCheck(particle_t* particle, SDL_Rect* rect);
 int lerp(int start, int end, float a);
 void genTree(qtree_t* tree, particle_t** buffer, int count);
+void freeTree(qtree_t* tree);
 void updateParticle(particle_t* particle, qtree_t* tree, float theta, SDL_Renderer* renderer, bool dispTree);
 
 int main(int argc, char **argv) {
@@ -129,17 +128,17 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        qtree_t tree;
-        tree.bounds.x = 0;
-        tree.bounds.y = 0;
-        tree.bounds.w = 800;
-        tree.bounds.h = 600;
-        tree.sub = 0;
-        tree.leaf = 0;
-        tree.mass = 0;
-        tree.mX = 0;
-        tree.mY = 0;
-        genTree(&tree, buffer, pCount);
+        qtree_t* tree = malloc(sizeof(qtree_t));
+        tree->bounds.x = 0;
+        tree->bounds.y = 0;
+        tree->bounds.w = 800;
+        tree->bounds.h = 600;
+        tree->sub = 0;
+        tree->leaf = 0;
+        tree->mass = 0;
+        tree->mX = 0;
+        tree->mY = 0;
+        genTree(tree, buffer, pCount);
         if (steps % drawOn == 0) {
             SetPalette(palette, 0, renderer);
             SDL_RenderClear(renderer);
@@ -147,21 +146,22 @@ int main(int argc, char **argv) {
         for (int i = 0; i < pCount; i++){
             SetPalette(palette, 2, renderer);
             if (i == viewInd && steps % drawOn == 0) {
-                updateParticle(particles + i, &tree, theta, renderer, 1);
+                updateParticle(particles + i, tree, theta, renderer, 1);
             }
             else {
-                updateParticle(particles + i, &tree, theta, renderer, 0);
+                updateParticle(particles + i, tree, theta, renderer, 0);
             }
             particles[i].pX += particles[i].vX * dt;
             particles[i].pY += particles[i].vY * dt;
             if (steps % drawOn == 0) {
-                SDL_SetRenderDrawColor(renderer, 255, lerp(100, 255, (float)(abs(particles[i].vX) + abs(particles[i].vY)) / 50000.0f), lerp(100, 255, (float)(abs(particles[i].vX) + abs(particles[i].vY)) / 50000.0f), 255);
+                SDL_SetRenderDrawColor(renderer, 255, lerp(100, 255, (float)(fabsf(particles[i].vX) + fabsf(particles[i].vY)) / 50000.0f), lerp(100, 255, (float)(fabsf(particles[i].vX) + fabsf(particles[i].vY)) / 50000.0f), 255);
                 SDL_RenderDrawPoint(renderer, particles[i].pX, particles[i].pY);
             }
         }
         //SetPalette(palette, 2, renderer);
         //drawTree(renderer, &tree);
         SDL_RenderPresent(renderer);  
+        freeTree(tree);
         steps++;
     }
 
@@ -169,6 +169,8 @@ int main(int argc, char **argv) {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+    free(particles);
+    free(buffer);
 
     return 0;
 }
@@ -210,8 +212,10 @@ void genTree(qtree_t* tree, particle_t** buffer, int count){
             pNum++;
         }
     }
-    tree->mX /= (tree->mass);
-    tree->mY /= (tree->mass);
+    if (tree->mass) {
+        tree->mX /= (tree->mass);
+        tree->mY /= (tree->mass);
+    }
     if (pNum > 1){
         
         for (int i = 0; i < 4; i++) {
@@ -241,11 +245,21 @@ void genTree(qtree_t* tree, particle_t** buffer, int count){
         tree->leaf = 1;
         tree->particle = In[0];
     }
+    free(In);
+}
+
+void freeTree(qtree_t* tree) {
+    if (tree->sub) {
+        for (int i = 0; i < 4; i++) {
+            freeTree((tree->branch)[i]);
+        }
+    }
+    free(tree);
 }
 
 void updateParticle(particle_t* particle, qtree_t* tree, float theta, SDL_Renderer* renderer, bool dispTree) {
     float distApprox = abs(tree->mX - particle->pX) + abs(tree->mY - particle->pY);
-    if (!distApprox) {
+    if ((tree->leaf && (tree->particle == particle)) || (!tree->sub && !tree->leaf)) {
         return;
     }
     if (((tree->bounds.w / distApprox) > theta) && tree->sub) {
